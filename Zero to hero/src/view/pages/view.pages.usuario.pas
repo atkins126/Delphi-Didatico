@@ -9,7 +9,8 @@ uses
   FireDAC.Stan.Intf, FireDAC.Stan.Option, FireDAC.Stan.Param,
   FireDAC.Stan.Error, FireDAC.DatS, FireDAC.Phys.Intf, FireDAC.DApt.Intf,
   FireDAC.Stan.StorageBin, FireDAC.Comp.DataSet, FireDAC.Comp.Client, Vcl.Grids,
-  Vcl.DBGrids, Vcl.WinXPanels, view.styles.colors, Vcl.ComCtrls;
+  Vcl.DBGrids, Vcl.WinXPanels, view.styles.colors, Vcl.ComCtrls,
+  Bind4D.Attributes, Bind4D.Types;
 
 type
   [FormRest('/users','guuid','name', 'asc')]
@@ -120,17 +121,13 @@ var
   AJson : TJsonObject;
 begin
   inherited;
-
   AJson := TBind4D.New.Form(self).FormToJson(fbDelete);
   try
     case application.MessageBox(PCHAR(concat('Confirma a exclusão do usuário ', AJson.FindValue('name').ToJSON, ' ?')), 'HutCode', MB_yesno + MB_ICONINFORMATION) of
       mrNo, mrCancel: Exit;
       mrYes: begin
-        TRequest.New.BaseURL('http://localhost:9000/users/')
-        .Accept('application/json')
-        .AddParam('id', AJson.FindValue('codigo').ToJSON)
-        .Delete;
-        IF application.MessageBox('Usuário excluído com sucesso!', 'HutCode', MB_OK + MB_TASKMODAL) = mrOk then
+        FDAO.Delete;
+        if application.MessageBox('Usuário excluído com sucesso!', 'HutCode', MB_OK + MB_TASKMODAL) = mrOk then
           ToggleDBGrid;
       end;
     end;
@@ -140,20 +137,24 @@ begin
 end;
 
 procedure TpgUsuario.btnSalvarClick(Sender: TObject);
-var
-  AJson : TJsonObject;
 begin
   inherited;
-  AJson := TBind4D.New.Form(self).FormToJson(fbPost);
   try
-    TRequest.New.BaseURL('http://localhost:9000/users')
-    .Accept('application/json')
-    .AddBody(AJson.ToString)
-    .Post;
-    ShowMessage('Usuário adicionado !');
+    case FTypeOperation of
+      toNull: exit;
+      toPost: begin
+        FDAO.Post;
+        ShowMessage('Usuário adicionado !');
+      end;
+      toPut: begin
+        FDAO.Put;
+        ShowMessage('Usuário atualizado !');
+      end;
+    end;
+    FTypeOperation := toNull;
     ToggleDBGrid;
-  finally
-     AJson.Free;
+  except on E: exception do
+    ShowMessage(E.Message);
   end;
 end;
 

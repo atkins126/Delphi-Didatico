@@ -6,12 +6,12 @@ uses
   Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ExtCtrls, Router4D.Interfaces,
   Vcl.StdCtrls, Vcl.Buttons, System.ImageList, Vcl.ImgList, Bind4D, Data.DB,
-  Vcl.Grids, Vcl.DBGrids, FireDAC.Stan.Intf, FireDAC.Stan.Option,
-  FireDAC.Stan.Param, FireDAC.Stan.Error, FireDAC.DatS, FireDAC.Phys.Intf,
-  FireDAC.DApt.Intf, FireDAC.Comp.DataSet, FireDAC.Comp.Client,
-  FireDAC.Stan.StorageBin, view.styles.colors, RESTRequest4D, Vcl.WinXPanels;
+  Vcl.Grids, Vcl.DBGrids, view.styles.colors, RESTRequest4D, Vcl.WinXPanels,
+  model.dao.interfaces;
 
 type
+  TTypeOperation = (toNull, toPost, toPut);
+
   TfrmTemplate = class(TForm, iRouter4DComponent)
     [ComponentBindStyle(COLOR_BACKGROUND, FONT_H6, CINZA, FONT_NAME_DEFAULT)]
     pnlMain: TPanel;
@@ -39,7 +39,6 @@ type
     Panel11: TPanel;
     DBGrid1: TDBGrid;
     DataSource1: TDataSource;
-    FDMemTable1: TFDMemTable;
     pnlAcoes: TPanel;
     btnExcluir: TSpeedButton;
     btnFechar: TSpeedButton;
@@ -60,6 +59,8 @@ type
     procedure GetEndPoint;
     procedure FormatList;
   protected
+    FDAO: iDAOInterface;
+    FTypeOperation : TTypeOperation;
     procedure ToggleDBGrid;
   public
     { Public declarations }
@@ -73,6 +74,8 @@ var
 implementation
 
 {$R *.dfm}
+
+uses model.dao.rest, System.StrUtils;
 
 { TForm1 }
 
@@ -90,21 +93,26 @@ end;
 
 procedure TfrmTemplate.btnNovoClick(Sender: TObject);
 begin
+  FTypeOperation := toPost;
   ToggleDBGrid;
   TBind4D.New.Form(Self).ClearFieldForm;
 end;
 
 procedure TfrmTemplate.DBGrid1DblClick(Sender: TObject);
 begin
-  TBind4D.New.Form(Self).BindDataSetToForm(FDMemTable1);
+  FTypeOperation := toPut;
+  TBind4D.New.Form(Self).BindDataSetToForm(FDAO.DataSet);
   ToggleDBGrid;
 end;
 
 procedure TfrmTemplate.FormCreate(Sender: TObject);
 
 begin
-  TBind4D.New.Form(self).BindFormDefault(FTitle).BindFormRest(FEndpoint, FPK, FSort, FSort).SetStyleComponents;
+  FTypeOperation := toNull;
+  FDAO := TDAOREST.New(Self).DataSource(DataSource1);
+  TBind4D.New.Form(self).BindFormDefault(FTitle).BindFormRest(FEndpoint, FPK, FSort, FOrder).SetStyleComponents;
   ApplyStyle;
+  GetEndPoint;
 end;
 
 procedure TfrmTemplate.FormResize(Sender: TObject);
@@ -114,10 +122,7 @@ end;
 
 procedure TfrmTemplate.GetEndPoint;
 begin
-   TRequest.New.BaseURL(Concat('http://localhost:9000/', FEndpoint))
-    .Accept('application/json')
-    .DataSetAdapter(FDMemTable1)
-    .Get;
+  FDAO.Get;
   FormatList;
 end;
 
@@ -133,12 +138,15 @@ end;
 
 procedure TfrmTemplate.ToggleDBGrid;
 begin
+  GetEndPoint;
   DBGrid1.Visible := not DBGrid1.Visible;
+  btnNovo.Caption := IfThen(DBGrid1.Visible, 'Novo', 'Voltar');
+  btnAtualizar.Visible := DBGrid1.Visible;
 end;
 
 procedure TfrmTemplate.FormatList;
 begin
-  TBind4D.New.Form(Self).BindFormatListDataSet(FDMemTable1, DBGrid1);
+  TBind4D.New.Form(Self).BindFormatListDataSet(FDAO.DataSet, DBGrid1);
 end;
 
 end.
